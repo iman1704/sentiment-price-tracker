@@ -6,9 +6,10 @@ Ingest and extract data from news feed and stock price
 - output these data to the database
 """
 
+import hashlib
+
 import feedparser
 import pandas as pd
-import hashlib
 import structlog
 import yfinance as yf
 from dateutil import parser
