@@ -1,0 +1,66 @@
+services:
+  # 1. Database Service
+  db:
+    image: postgres:15-alpine
+    container_name: sentiment_db
+    environment:
+      # Pulls from .env, defaults provided if missing
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-sentiment_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Ensures DB is ready before Worker starts
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-sentiment_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      - network
+
+  # 2. Orchestration/Worker Service (The Backend)
+  worker:
+    build: .
+    container_name: sentiment_worker
+    command: python src/pipeline.py
+    volumes:
+      # Mounts current directory to /app for live code updates during dev
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: always
+    networks:
+      - network
+
+  # 3. Visualization Service (The Frontend)
+  dashboard:
+    build: .
+    container_name: sentiment_dashboard
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Kuala_Lumpur
+    restart: always
+    networks:
+      - network
+
+volumes:
+  postgres_data:
+
+networks:
+  network:
